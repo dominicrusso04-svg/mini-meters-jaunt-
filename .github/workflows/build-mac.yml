@@ -1,0 +1,33 @@
+name: Build macOS plugin
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (universal: Apple Silicon + Intel)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build
+        run: cmake --build build --config Release -j 4
+
+      - name: Sign (ad-hoc) and package
+        run: |
+          ART=build/NanoStrip_artefacts/Release
+          mkdir -p out
+          cp -R "$ART/VST3/NanoStrip.vst3" out/
+          cp -R "$ART/AU/NanoStrip.component" out/
+          cp -R "$ART/Standalone/NanoStrip.app" out/
+          for b in out/*; do codesign --force --deep --sign - "$b"; done
+          cp README.md out/
+          cd out && zip -r -y ../NanoStrip-mac.zip .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NanoStrip-mac
+          path: NanoStrip-mac.zip
